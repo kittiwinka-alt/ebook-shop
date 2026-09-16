@@ -104,11 +104,11 @@ function CheckoutContent() {
           </div>
         </div>
 
-        {/* ฟอร์มกรอกข้อมูลผู้ซื้อ[cite: 1] */}
+        {/* ฟอร์มกรอกข้อมูลผู้ซื้อ */}
         <form onSubmit={handleCheckout} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              ชื่อ - นามสกุล[cite: 1]
+              ชื่อ - นามสกุล
             </label>
             <input
               type="text"
@@ -122,7 +122,7 @@ function CheckoutContent() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              อีเมลสำหรับรับไฟล์ E-book[cite: 1]
+              อีเมลสำหรับรับไฟล์ E-book
             </label>
             <input
               type="email"
@@ -139,7 +139,7 @@ function CheckoutContent() {
             disabled={loading}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition disabled:opacity-50 mt-4"
           >
-            {loading ? 'กำลังสร้างคำสั่งซื้อ...' : 'ยืนยันสั่งซื้อและไปชำระเงิน[cite: 1]'}
+            {loading ? 'กำลังสร้างคำสั่งซื้อ...' : 'ยืนยันสั่งซื้อและไปชำระเงิน'}
           </button>
         </form>
       </div>
