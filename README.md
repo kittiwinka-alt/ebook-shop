@@ -1,36 +1,52 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Win's Dev E-Book Shop
 
-## Getting Started
+แพลตฟอร์มอีคอมเมิร์ซสำหรับจัดจำหน่ายหนังสืออิเล็กทรอนิกส์และดิจิทัลแอสเซท (E-Books & Digital Products) พัฒนาด้วย **Next.js (App Router)** ร่วมกับ **Supabase** สำหรับระบบฐานข้อมูลและการจัดการสิทธิ์การเข้าถึง พร้อมรองรับระบบรับชำระเงินออนไลน์ผ่าน **Stripe** และระบบส่งใบเสร็จอัตโนมัติด้วย **Nodemailer**
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 🌟 ฟีเจอร์หลักของระบบ (Key Features)
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### หน้าร้านค้าและผู้ใช้งานทั่วไป (Storefront & User Features)
+* **การจัดการแคตตาล็อกสินค้า:** ค้นหา กรองหมวดหมู่ และเรียงลำดับสินค้าตามราคา วันที่วางจำหน่าย หรือความนิยม
+* **ระบบตะกร้าสินค้า (Shopping Cart):** คำนวณยอดชำระสุทธิแบบเรียลไทม์ พร้อมตรวจสอบความถูกต้องของรายการสั่งซื้อ
+* **ระบบชำระเงินแบบหลายช่องทาง (Payment Gateway):** รองรับการชำระเงินผ่านบัตรเครดิต/เดบิต และ QR PromptPay ด้วย Stripe Checkout
+* **ชั้นหนังสือดิจิทัลส่วนตัว (Personal Library):** ลูกค้าสามารถเข้าถึงและดาวน์โหลดไฟล์ E-Book หรือ Source Code ได้ทันทีหลังการชำระเงินเสร็จสิ้น
+* **ระบบแจ้งเตือนทางอีเมล (Email Notification):** จัดส่งใบเสร็จยืนยันคำสั่งซื้อพร้อมลิงก์ดาวน์โหลดเข้าสู่อีเมลผู้ซื้ออัตโนมัติ
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### ระบบจัดการหลังบ้านสำหรับผู้ดูแลระบบ (Admin Dashboard)
+* **การควบคุมสิทธิ์อย่างเข้มงวด (Access Control & Security):** ตรวจสอบสิทธิ์เฉพาะอีเมลผู้ดูแลระบบที่ได้รับอนุญาต และป้องกันการเข้าถึงข้อมูลผ่าน Row Level Security (RLS)
+* **ภาพรวมยอดขายและสถิติ (Analytics Overview):** แสดงผลข้อมูลยอดขายรวม จำนวนออเดอร์ ลูกค้า และสินค้า พร้อมกราฟแนวโน้มยอดขายทั้งแบบรายสัปดาห์และรายเดือน
+* **การจัดการคำสั่งซื้อ (Order Management):** ตรวจสอบประวัติคำสั่งซื้อ ค้นหาตามรหัสคำสั่งซื้อหรือข้อมูลลูกค้า และส่งออกข้อมูลเป็นไฟล์ CSV
+* **การจัดการสินค้าและระบบ (Product & Site Settings):** เพิ่ม แก้ไข ปรับสถานะสินค้า และปรับแต่งข้อมูลร้านค้า เช่น โลโก้ ชื่อร้าน หมวดหมู่ และตัวเลือกการจัดเรียง
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## 🛠 เทคโนโลยีที่ใช้งาน (Tech Stack)
 
-To learn more about Next.js, take a look at the following resources:
+* **Frontend & Backend Framework:** [Next.js](https://nextjs.org/) (App Router, TypeScript, Tailwind CSS)
+* **Database & Authentication:** [Supabase](https://supabase.com/) (PostgreSQL, Supabase Auth, Storage & Row Level Security)
+* **Payment Gateway:** [Stripe](https://stripe.com/) (Stripe Checkout Session API)
+* **Email Service:** [Nodemailer](https://nodemailer.com/) (Gmail SMTP Integration)
+* **Deployment & Hosting:** [Vercel](https://vercel.com/)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## ⚙️ ตัวแปรสภาพแวดล้อม (Environment Variables)
 
-## Deploy on Vercel
+สร้างไฟล์ `.env.local` ที่ Root directory ของโปรเจกต์ และระบุค่าการกำหนดค่าดังต่อไปนี้:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```env
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=[https://your-project.supabase.co](https://your-project.supabase.co)
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Stripe Payment Gateway
+STRIPE_SECRET_KEY=sk_test_...
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+
+# Email Service (Gmail SMTP)
+GMAIL_USER=your-email@gmail.com
+GMAIL_APP_PASSWORD=your-app-password
+
+# Site Domain Configuration
+NEXT_PUBLIC_SITE_URL=[https://your-domain.vercel.app](https://your-domain.vercel.app)
