@@ -66,6 +66,7 @@ export default function AdminBooksPage() {
   const [editingBookId, setEditingBookId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingProductFile, setUploadingProductFile] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -256,6 +257,7 @@ export default function AdminBooksPage() {
     setIsModalOpen(true);
   };
 
+  // 1. ฟังก์ชันอัปโหลดรูปหน้าปก
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -282,6 +284,34 @@ export default function AdminBooksPage() {
     }
   };
 
+  // 2. ฟังก์ชันอัปโหลดไฟล์สินค้า (PDF, ZIP, ฯลฯ)
+  const handleProductFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploadingProductFile(true);
+      const fileExt = file.name.split('.').pop() || 'file';
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `files/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('ebook-files')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from('ebook-files').getPublicUrl(filePath);
+      setFormData((prev) => ({ ...prev, file_path: data.publicUrl }));
+      showToast(`อัปโหลดไฟล์ "${file.name}" เรียบร้อยแล้ว`, 'success');
+    } catch (err: any) {
+      showToast('อัปโหลดไฟล์ไม่สำเร็จ: ' + err.message, 'error');
+    } finally {
+      setUploadingProductFile(false);
+      e.target.value = '';
+    }
+  };
+
   const confirmDeleteBook = async () => {
     if (!deleteModal.bookId) return;
 
@@ -297,8 +327,8 @@ export default function AdminBooksPage() {
 
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.title || !formData.price || !formData.cover_url) {
-      showToast('กรุณากรอกข้อมูลสำคัญ (ชื่อ, ราคา, รูปภาพ) ให้ครบถ้วน', 'warn');
+    if (!formData.title || !formData.price || !formData.cover_url || !formData.file_path) {
+      showToast('กรุณากรอกข้อมูลสำคัญ (ชื่อ, ราคา, รูปภาพ, ไฟล์ดาวน์โหลด) ให้ครบถ้วน', 'warn');
       return;
     }
 
@@ -663,7 +693,7 @@ export default function AdminBooksPage() {
                     />
 
                     <label className="absolute inset-2 bg-black/70 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer text-white text-xs font-semibold gap-1.5 border-2 border-dashed border-indigo-400">
-                      <span>เปลี่ยนรูปหน้าปก</span>
+                      <span>{uploadingImage ? 'กำลังอัปโหลด...' : 'เปลี่ยนรูปหน้าปก'}</span>
                       <span className="text-[10px] text-slate-400">(JPG, PNG, WEBP)</span>
                       <input
                         type="file"
@@ -777,18 +807,44 @@ export default function AdminBooksPage() {
                     </div>
                   </div>
 
+                  {/* ช่องจัดการไฟล์สินค้า: อัปโหลดเข้า Supabase Storage หรือกรอก URL */}
                   <div>
-                    <label className="block text-[11px] font-semibold text-indigo-400 mb-1">
-                      ลิงก์ดาวน์โหลดไฟล์ (URL) *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.file_path}
-                      onChange={(e) => setFormData({ ...formData, file_path: e.target.value })}
-                      placeholder="https://drive.google.com/..."
-                      className="w-full bg-[#131C31] border border-slate-800 focus:border-indigo-500 rounded-xl px-4 py-2 text-xs text-white outline-none"
-                    />
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-[11px] font-semibold text-indigo-400">
+                        ไฟล์สินค้า / ลิงก์ดาวน์โหลดไฟล์ (URL) *
+                      </label>
+                      {uploadingProductFile && (
+                        <span className="text-[10px] text-indigo-400 animate-pulse font-medium">กำลังอัปโหลดไฟล์...</span>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <label className="cursor-pointer px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 hover:text-white border border-indigo-500/30 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003-3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                          </svg>
+                          <span>{uploadingProductFile ? 'กำลังอัปโหลด...' : 'เลือกไฟล์จากเครื่อง (PDF, ZIP)'}</span>
+                          <input
+                            type="file"
+                            accept=".pdf,.zip,.rar,.epub,.7z"
+                            onChange={handleProductFileUpload}
+                            disabled={uploadingProductFile}
+                            className="hidden"
+                          />
+                        </label>
+                        <span className="text-[11px] text-slate-500">หรือวาง URL ด้านล่าง</span>
+                      </div>
+
+                      <input
+                        type="text"
+                        required
+                        value={formData.file_path}
+                        onChange={(e) => setFormData({ ...formData, file_path: e.target.value })}
+                        placeholder="https://drive.google.com/... หรือ URL ไฟล์ดาวน์โหลด"
+                        className="w-full bg-[#131C31] border border-slate-800 focus:border-indigo-500 rounded-xl px-4 py-2 text-xs text-white outline-none"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -845,7 +901,7 @@ export default function AdminBooksPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting || uploadingImage}
+                  disabled={isSubmitting || uploadingImage || uploadingProductFile}
                   className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold px-7 py-2.5 rounded-xl text-xs transition-colors shadow-md shadow-indigo-600/30 flex items-center gap-2 cursor-pointer active:scale-98"
                 >
                   {isSubmitting ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
