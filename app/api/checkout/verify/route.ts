@@ -3,17 +3,13 @@ import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16' as any,
-});
-
 // สร้าง Supabase client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// สร้าง Transporter ส่งอีเมลผ่าน Gmail
+// สร้าง Transporter สำหรับส่งอีเมลผ่าน Gmail
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -24,6 +20,20 @@ const transporter = nodemailer.createTransport({
 
 export async function POST(req: Request) {
   try {
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+
+    if (!stripeSecretKey) {
+      console.error('Missing STRIPE_SECRET_KEY in environment variables');
+      return NextResponse.json(
+        { error: 'Stripe API key is not configured' },
+        { status: 500 }
+      );
+    }
+
+    const stripe = new Stripe(stripeSecretKey, {
+      apiVersion: '2023-10-16' as any,
+    });
+
     const { sessionId } = await req.json();
 
     if (!sessionId) {
@@ -51,14 +61,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Metadata missing' }, { status: 400 });
     }
 
-    // 3. ดึงอีเมลจริงของ User จาก Supabase โดยตรง
+    // 3. ดึงอีเมลของผู้ใช้
     let targetEmail = session.customer_details?.email || session.customer_email;
     
-    // ค้นหาอีเมลของบัญชีที่ล็อกอินอยู่จากตาราง profiles หรือ auth metadata
     if (session.metadata?.userEmail) {
       targetEmail = session.metadata.userEmail;
     } else {
-      // ดึงอีเมลผู้ใช้จาก Supabase
       const { data: userData } = await supabase
         .from('profiles')
         .select('email')
@@ -91,9 +99,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
 
-    // 5. ส่งอีเมลยืนยันคำสั่งซื้อเข้าอีเมลของบัญชีผู้ใช้
+    // 5. ส่งอีเมลยืนยันคำสั่งซื้อ
     if (targetEmail && process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
       const orderId = insertedData?.[0]?.id ? `ORD-${insertedData[0].id.substring(0, 8).toUpperCase()}` : 'ORD-SUCCESS';
+      
+      // ดึง Origin จาก Request หรือ Environment เพื่อไม่ให้ติด localhost ใน Production
+      const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || 'https://ebook-shop-fawn.vercel.app';
 
       try {
         await transporter.sendMail({
@@ -102,7 +113,7 @@ export async function POST(req: Request) {
           subject: `ยืนยันคำสั่งซื้อสำเร็จ (${orderId}) - Win's Dev Store`,
           html: `
             <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px;">
-              <h2 style="color: #4f46e5; margin-bottom: 8px;">ชำระเงินสำเร็จเรียบร้อย!</h2>
+              <h2 style="color: #4f46e5; margin-bottom: 8px;">ชำระเงินสำเร็จเรียบร้อย</h2>
               <p style="color: #475569; font-size: 14px;">ขอบคุณสำหรับการสั่งซื้อสินค้ากับ Win's Dev Store</p>
               
               <div style="background-color: #f8fafc; padding: 16px; border-radius: 12px; margin: 20px 0;">
@@ -112,19 +123,18 @@ export async function POST(req: Request) {
               </div>
 
               <p style="color: #475569; font-size: 14px;">
-                E-Book หรือไฟล์ของคุณพร้อมให้ดาวน์โหลดแล้ว สามารถเข้าสู่ระบบและไปที่ชั้นหนังสือเพื่อดาวน์โหลดได้ทันที
+                สินค้าของคุณพร้อมสำหรับการดาวน์โหลดแล้ว สามารถเข้าสู่ระบบและไปที่ชั้นหนังสือเพื่อดาวน์โหลดไฟล์ได้ทันที
               </p>
 
               <div style="margin-top: 24px;">
-                <a href="http://localhost:3000/profile?tab=library" 
+                <a href="${origin}/profile?tab=library" 
                    style="background-color: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
-                  ไปที่ชั้นหนังสือของฉัน
+                  ไปยังชั้นหนังสือ
                 </a>
               </div>
             </div>
           `,
         });
-        console.log('ส่งอีเมลไปยังบัญชีผู้ใช้สำเร็จ:', targetEmail);
       } catch (mailErr) {
         console.error('การส่งอีเมลล้มเหลว:', mailErr);
       }
