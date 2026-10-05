@@ -1,12 +1,22 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16' as any,
-});
-
 export async function POST(req: Request) {
   try {
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+
+    if (!stripeSecretKey) {
+      console.error('Missing STRIPE_SECRET_KEY in environment variables');
+      return NextResponse.json(
+        { error: 'ระบบการชำระเงินยังไม่ได้กำหนดค่า API Key' },
+        { status: 500 }
+      );
+    }
+
+    const stripe = new Stripe(stripeSecretKey, {
+      apiVersion: '2023-10-16' as any,
+    });
+
     const { items, paymentMethod, userId } = await req.json();
 
     // หา base URL ที่ปลอดภัย
