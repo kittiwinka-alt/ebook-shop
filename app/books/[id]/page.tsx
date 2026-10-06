@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
@@ -34,7 +34,7 @@ interface Book {
 export default function BookDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const bookId = params?.id as string;
+  const rawId = params?.id as string;
 
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,9 +44,19 @@ export default function BookDetailPage() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isDark, setIsDark] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [cacheBuster, setCacheBuster] = useState<number>(Date.now());
   
   // สถานะตรวจสอบว่าเคยซื้อเล่มนี้ไปหรือยัง
   const [isPurchased, setIsPurchased] = useState(false);
+
+  // การตั้งค่าร้านค้าพร้อมโลโก้
+  const [siteSettings, setSiteSettings] = useState({
+    store_name: "Win's Dev Store",
+    store_subtitle: 'DIGITAL ASSETS & E-BOOKS',
+    items_label: 'แสดง {count} รายการ',
+    logo_url: '/logo.png',
+    categories: ['ทั้งหมด', 'E-Book', 'Template', 'Source Code'],
+  });
   
   // State สำหรับ Modern Toast Notification
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'warn' }>({
@@ -85,12 +95,11 @@ export default function BookDetailPage() {
     }
   };
 
-  useEffect(() => {
-    if (!bookId) return;
+  const loadData = useCallback(async () => {
+    if (!rawId) return;
+    setLoading(true);
 
-    async function loadData() {
-      setLoading(true);
-
+    try {
       const { data: { session } } = await supabase.auth.getSession();
       const currentUser = session?.user ?? null;
       setUser(currentUser);
@@ -105,15 +114,35 @@ export default function BookDetailPage() {
         }
       }
 
+      // ดึงข้อมูลสินค้าโดยใช้ String ID ตรงๆ
       const { data: bookData, error } = await supabase
         .from('books')
         .select('*')
-        .eq('id', bookId)
+        .eq('id', String(rawId))
         .maybeSingle();
 
       if (!error && bookData) {
         setBook(bookData);
       }
+
+      // ดึงข้อมูลการตั้งค่าร้านค้าและโลโก้ล่าสุดจาก Database
+      const { data: settingsData } = await supabase
+        .from('site_settings')
+        .select('*')
+        .eq('id', 'default')
+        .maybeSingle();
+
+      if (settingsData) {
+        setSiteSettings({
+          store_name: settingsData.store_name || "Win's Dev Store",
+          store_subtitle: settingsData.store_subtitle || 'DIGITAL ASSETS & E-BOOKS',
+          items_label: settingsData.items_label || 'แสดง {count} รายการ',
+          logo_url: settingsData.logo_url || '/logo.png',
+          categories: Array.isArray(settingsData.categories) ? settingsData.categories : ['ทั้งหมด', 'E-Book', 'Template', 'Source Code'],
+        });
+      }
+
+      setCacheBuster(Date.now());
 
       if (currentUser) {
         const { data: orders } = await supabase
@@ -125,15 +154,19 @@ export default function BookDetailPage() {
         if (orders && orders.length > 0) {
           const purchased = orders.some((ord) => {
             const ids = (ord.book_ids || '').split(',').map((id: string) => id.trim());
-            return ids.includes(bookId);
+            return ids.includes(String(rawId));
           });
           setIsPurchased(purchased);
         }
       }
-
+    } catch (err) {
+      console.error('Error fetching book detail or settings:', err);
+    } finally {
       setLoading(false);
     }
+  }, [rawId]);
 
+  useEffect(() => {
     loadData();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -141,7 +174,7 @@ export default function BookDetailPage() {
     });
 
     return () => subscription.unsubscribe();
-  }, [bookId]);
+  }, [loadData]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -193,7 +226,6 @@ export default function BookDetailPage() {
   const avatarUrl = user?.user_metadata?.avatar_url;
   const userDisplayName = user?.user_metadata?.display_name || user?.email?.split('@')[0];
 
-  // ฟังก์ชันแปลงเวลาอัปโหลดเป็นภาษาไทย
   const formatUploadDate = (dateString?: string) => {
     if (!dateString) return 'เพิ่งอัปโหลดเร็วๆ นี้';
     try {
@@ -209,6 +241,12 @@ export default function BookDetailPage() {
     } catch {
       return 'เพิ่งอัปโหลดเร็วๆ นี้';
     }
+  };
+
+  const getImageSource = (url?: string) => {
+    if (!url) return 'https://placehold.co/400x500/1e293b/FFFFFF?text=No+Cover';
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}t=${cacheBuster}`;
   };
 
   if (loading) {
@@ -235,7 +273,6 @@ export default function BookDetailPage() {
       className="min-h-screen bg-slate-50 dark:bg-[#0B1120] text-slate-800 dark:text-slate-200 font-sans pb-16 transition-colors duration-200"
       onClick={() => { if (isUserMenuOpen) setIsUserMenuOpen(false); }}
     >
-      
       {/* Toast แจ้งเตือนสไตล์ Modern */}
       {toast.show && (
         <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300">
@@ -253,18 +290,22 @@ export default function BookDetailPage() {
       {/* แถบ Navbar ด้านบน */}
       <nav className="w-full bg-white dark:bg-[#0F172A] border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40 py-3">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between gap-4">
-          
           <Link href="/" className="flex items-center gap-3 shrink-0">
-            <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-indigo-500/20 shrink-0 flex items-center justify-center p-1 bg-slate-900/10 dark:bg-slate-800/50">
+            <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-indigo-500/20 shrink-0 flex items-center justify-center">
               <img 
-                src="/logo.png" 
-                alt="Win's Dev Store Logo" 
+                src={siteSettings.logo_url || '/logo.png'} 
+                alt="Store Logo" 
                 className="w-full h-full object-contain" 
+                onError={(e: any) => { e.target.src = '/logo.png'; }}
               />
             </div>
             <div className="hidden sm:block">
-              <h1 className="text-slate-900 dark:text-white font-bold text-lg leading-none tracking-wide">Win's Dev Store</h1>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">DIGITAL ASSETS & E-BOOKS</p>
+              <h1 className="text-slate-900 dark:text-white font-bold text-lg leading-none tracking-wide">
+                {siteSettings.store_name}
+              </h1>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                {siteSettings.store_subtitle}
+              </p>
             </div>
           </Link>
 
@@ -399,13 +440,17 @@ export default function BookDetailPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 mt-2">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
-          {/* คอลัมน์ซ้าย: รูปหน้าปก */}
+          {/* คอลัมน์ซ้าย: รูปหน้าปกพร้อมกลไกตัดแคช */}
           <div className="lg:col-span-4 flex flex-col items-center">
             <div className="w-full max-w-[320px] aspect-[3/4] bg-white dark:bg-[#131C31] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-2xl p-2 relative">
               <img
-                src={book.cover_url}
+                key={`${book.cover_url}_${cacheBuster}`}
+                src={getImageSource(book.cover_url)}
                 alt={book.title}
                 className="w-full h-full object-cover rounded-xl"
+                onError={(e: any) => {
+                  e.target.src = 'https://placehold.co/400x500/1e293b/FFFFFF?text=No+Cover';
+                }}
               />
               {isPurchased && (
                 <div className="absolute top-4 right-4 bg-emerald-500 text-white text-[11px] font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-1.5">
@@ -421,7 +466,6 @@ export default function BookDetailPage() {
               {book.title}
             </h1>
 
-            {/* แสดงชื่อผู้เขียน, หมวดหมู่ และเวลาอัปโหลด */}
             <div className="space-y-1.5 text-xs text-slate-500 dark:text-slate-400 mb-6">
               <p>ผู้เขียน / ผู้อัปโหลด: <span className="text-indigo-600 dark:text-indigo-400 font-bold">{book.author || "Win's Dev Store"}</span></p>
               <p>หมวดหมู่: <span className="text-slate-700 dark:text-slate-300 font-medium">{book.category}</span></p>
@@ -430,7 +474,6 @@ export default function BookDetailPage() {
               </p>
             </div>
 
-            {/* ตารางคุณสมบัติสินค้า */}
             <div className="bg-white dark:bg-[#131C31] border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 mb-6 text-xs divide-y divide-slate-100 dark:divide-slate-800/60 shadow-sm">
               <div className="flex justify-between py-2.5">
                 <span className="text-slate-500 dark:text-slate-400">รูปแบบการจัดส่ง</span>

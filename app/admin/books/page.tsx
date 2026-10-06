@@ -11,7 +11,6 @@ const supabase = createClient(
 );
 
 const ADMIN_EMAILS = [
-  'admin@winsdev.store',
   'kittiwin.ka@rmuti.ac.th',
 ];
 
@@ -240,7 +239,7 @@ export default function AdminBooksPage() {
   };
 
   const handleOpenEditModal = (book: Book) => {
-    setEditingBookId(book.id);
+    setEditingBookId(String(book.id));
     setFormData({
       title: book.title || '',
       author: book.author || "Win's Dev Store",
@@ -257,7 +256,7 @@ export default function AdminBooksPage() {
     setIsModalOpen(true);
   };
 
-  // 1. ฟังก์ชันอัปโหลดรูปหน้าปก
+  // ฟังก์ชันอัปโหลดรูปหน้าปก
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -275,7 +274,10 @@ export default function AdminBooksPage() {
       if (uploadError) throw uploadError;
 
       const { data } = supabase.storage.from('book-covers').getPublicUrl(filePath);
-      setFormData((prev) => ({ ...prev, cover_url: data.publicUrl }));
+      
+      // เพิ่ม timestamp ท้าย URL เพื่อให้รูปภาพใหม่อัปเดตทันทีโดยไม่ติด Cache
+      const freshUrl = `${data.publicUrl}?t=${Date.now()}`;
+      setFormData((prev) => ({ ...prev, cover_url: freshUrl }));
       showToast('อัปโหลดรูปภาพสำเร็จ', 'success');
     } catch (err: any) {
       showToast('อัปโหลดรูปภาพไม่สำเร็จ: ' + err.message, 'error');
@@ -284,7 +286,7 @@ export default function AdminBooksPage() {
     }
   };
 
-  // 2. ฟังก์ชันอัปโหลดไฟล์สินค้า (PDF, ZIP, ฯลฯ)
+  // ฟังก์ชันอัปโหลดไฟล์สินค้า (PDF, ZIP, ฯลฯ)
   const handleProductFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -315,11 +317,11 @@ export default function AdminBooksPage() {
   const confirmDeleteBook = async () => {
     if (!deleteModal.bookId) return;
 
-    const { error } = await supabase.from('books').delete().eq('id', deleteModal.bookId);
+    const { error } = await supabase.from('books').delete().eq('id', String(deleteModal.bookId));
     if (error) {
       showToast('ลบไม่สำเร็จ: ' + error.message, 'error');
     } else {
-      setBooks((prev) => prev.filter((b) => b?.id !== deleteModal.bookId));
+      setBooks((prev) => prev.filter((b) => String(b?.id) !== String(deleteModal.bookId)));
       setDeleteModal({ isOpen: false, bookId: null, bookTitle: '' });
       showToast('ลบสินค้าออกจากระบบเรียบร้อยแล้ว', 'success');
     }
@@ -350,12 +352,11 @@ export default function AdminBooksPage() {
 
     try {
       if (editingBookId) {
-        const targetId = isNaN(Number(editingBookId)) ? editingBookId : Number(editingBookId);
-
+        // อัปเดตข้อมูลโดยตรงผ่าน ID ที่เป็น String
         const { data, error } = await supabase
           .from('books')
           .update(payload)
-          .eq('id', targetId)
+          .eq('id', String(editingBookId))
           .select();
 
         if (error) {
@@ -367,10 +368,9 @@ export default function AdminBooksPage() {
 
         if (data && data.length > 0) {
           setBooks((prev) => prev.map((b) => (String(b?.id) === String(editingBookId) ? data[0] : b)));
-        } else {
-          await fetchBooks();
         }
 
+        await fetchBooks();
         setIsModalOpen(false);
         showToast('บันทึกการแก้ไขเรียบร้อยแล้ว', 'success');
       } else {
